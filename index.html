@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>踏み台昇降タイマー</title>
+    <style>
+        :root {
+            --primary: #4a90e2;
+            --primary-dark: #357abd;
+            --accent: #ff6b6b;
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-main: #333333;
+            --text-sub: #666666;
+            --right-foot: #e74c3c;
+            --left-foot: #3498db;
+            --pulse-color: #ff6b6b;
+            --rest-color: #2ecc71;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 15px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        header {
+            text-align: center;
+            padding: 5px 0;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            color: #2c3e50;
+        }
+
+        /* 視覚的ステップ表示エリア */
+        .stage-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .step-instruction {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            height: 2.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #2c3e50;
+        }
+
+        .bench-container {
+            width: 260px;
+            height: 220px;
+            position: relative;
+            margin: 10px 0;
+            background: rgba(0,0,0,0.02);
+            border-radius: 12px;
+        }
+
+        /* 踏み台 */
+        .bench {
+            position: absolute;
+            top: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 70px;
+            background: #9b59b6;
+            border: 3px solid #7d3c98;
+            border-radius: 10px;
+            box-shadow: 0 6px 0 #6c3483, 0 10px 15px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+            z-index: 1;
+        }
+
+        /* 足のベーススタイル */
+        .foot {
+            position: absolute;
+            width: 44px;
+            height: 64px;
+            border-radius: 22px 22px 14px 14px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 0.85rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            transition: all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 2;
+            opacity: 0.3;
+            transform: scale(0.9);
+        }
+
+        .foot::after {
+            content: '';
+            width: 14px;
+            height: 8px;
+            background: rgba(255,255,255,0.4);
+            border-radius: 4px;
+            margin-top: 4px;
+        }
+
+        .foot.left {
+            background-color: var(--left-foot);
+            border: 2px solid #2980b9;
+        }
+
+        .foot.right {
+            background-color: var(--right-foot);
+            border: 2px solid #c0392b;
+        }
+
+        /* 足の位置：床（下） */
+        .foot.left.floor {
+            top: 135px;
+            left: 70px;
+        }
+
+        .foot.right.floor {
+            top: 135px;
+            right: 70px;
+        }
+
+        /* 足の位置：台の上（上） */
+        .foot.left.on-bench {
+            top: 28px;
+            left: 70px;
+        }
+
+        .foot.right.on-bench {
+            top: 28px;
+            right: 70px;
+        }
+
+        /* アクティブな足の強調表示 */
+        .foot.active {
+            opacity: 1;
+            transform: scale(1.15);
+            z-index: 10;
+            box-shadow: 0 0 15px rgba(255,255,255,0.8), 0 8px 12px rgba(0,0,0,0.3);
+        }
+
+        /* アナウンスバー */
+        .announcement {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(231, 76, 60, 0.95);
+            color: white;
+            text-align: center;
+            padding: 8px;
+            font-weight: bold;
+            font-size: 0.95rem;
+            transform: translateY(-100%);
+            transition: transform 0.3s ease;
+            z-index: 20;
+        }
+
+        .announcement.show {
+            transform: translateY(0);
+        }
+
+        /* タイマー・情報表示 */
+        .info-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 15px 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .timer-display {
+            font-size: 3.5rem;
+            font-weight: 800;
+            text-align: center;
+            font-family: monospace;
+            color: #2c3e50;
+            line-height: 1;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 5px;
+        }
+
+        .stat-item {
+            background: #f1f3f5;
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-sub);
+            margin-bottom: 2px;
+        }
+
+        .stat-value {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        /* コントロール・設定エリア */
+        .controls-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-danger {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #e9ecef;
+            color: #495057;
+        }
+
+        .btn-secondary:hover {
+            background: #dee2e6;
+        }
+
+        .setting-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .setting-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: var(--text-sub);
+        }
+
+        .setting-value {
+            color: var(--primary);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #e0e0e0;
+            outline: none;
+            accent-color: var(--primary);
+        }
+
+        .preset-buttons {
+            display: flex;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .btn-sm {
+            padding: 6px 10px;
+            font-size: 0.8rem;
+            border-radius: 6px;
+            flex: 1;
+        }
+
+        /* --- 脈拍測定 & 休息モードUI (円形カウントダウン) --- */
+        .pulse-mode-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 20px;
+            padding: 25px 15px;
+            width: 100%;
+        }
+
+        .pulse-set-info {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: var(--primary);
+            background: #e8f4fd;
+            padding: 6px 20px;
+            border-radius: 20px;
+        }
+
+        .pulse-status-text {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* タイマー円弧コンテナ */
+        .timer-ring-container {
+            position: relative;
+            width: 220px;
+            height: 220px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 10px 0;
+        }
+
+        .timer-ring-svg {
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg); /* 時計の12時位置からスタート */
+        }
+
+        .ring-bg {
+            fill: none;
+            stroke: #e9ecef;
+            stroke-width: 12;
+        }
+
+        .ring-progress {
+            fill: none;
+            stroke: var(--pulse-color);
+            stroke-width: 12;
+            stroke-linecap: round;
+            stroke-dasharray: 565.48; /* 2 * π * r (r=90) */
+            stroke-dashoffset: 0;
+            transition: stroke-dashoffset 0.3s linear, stroke 0.4s ease;
+        }
+
+        /* 円弧の中心の文字 */
+        .ring-center-content {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ring-number {
+            font-size: 4.5rem;
+            font-weight: 800;
+            font-family: monospace;
+            line-height: 1;
+            color: #2c3e50;
+        }
+
+        .ring-unit {
+            font-size: 0.9rem;
+            color: var(--text-sub);
+            font-weight: bold;
+            margin-top: 4px;
+        }
+
+        /* モード切替制御 */
+        .workout-mode { display: flex; flex-direction: column; gap: 15px; }
+        .pulse-mode { display: none; }
+
+        body.in-pulse-mode .workout-mode { display: none; }
+        body.in-pulse-mode .pulse-mode { display: flex; flex-direction: column; gap: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>踏み台昇降タイマー</h1>
+    </header>
+
+    <!-- 1. 通常トレーニングモード -->
+    <div class="workout-mode">
+        <div class="stage-card">
+            <div id="announcement" class="announcement">後半戦！ 軸足を切り替えます</div>
+            <div id="step-instruction" class="step-instruction">スタートを押してください</div>
+            
+            <div class="bench-container">
+                <div class="bench">踏み台</div>
+                
+                <!-- 床の上の足 -->
+                <div id="foot-left-floor" class="foot left floor">左</div>
+                <div id="foot-right-floor" class="foot right floor">右</div>
+                
+                <!-- 台の上の足 -->
+                <div id="foot-left-bench" class="foot left on-bench">左</div>
+                <div id="foot-right-bench" class="foot right on-bench">右</div>
+            </div>
+        </div>
+
+        <div class="info-card">
+            <div id="timer-display" class="timer-display">03:00</div>
+            
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-label">ペース</div>
+                    <div id="bpm-display" class="stat-value">120 BPM</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">合計歩数</div>
+                    <div id="step-count" class="stat-value">0 歩</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls-card">
+            <div class="btn-group">
+                <button id="btn-start" class="btn btn-primary">
+                    <span id="start-icon">▶</span> <span id="start-text">スタート</span>
+                </button>
+                <button id="btn-reset" class="btn btn-secondary">リセット</button>
+            </div>
+
+            <div class="setting-group">
+                <div class="setting-header">
+                    <span>テンポ (BPM)</span>
+                    <span id="bpm-val" class="setting-value">120</span>
+                </div>
+                <input type="range" id="input-bpm" min="60" max="180" step="1" value="120">
+                <div class="preset-buttons">
+                    <button class="btn btn-secondary btn-sm" onclick="setBpm(80)">80 (ゆっくり)</button>
+                    <button class="btn btn-secondary btn-sm" onclick="setBpm(100)">100 (標準)</button>
+                    <button class="btn btn-secondary btn-sm" onclick="setBpm(120)">120 (快活)</button>
+                    <button class="btn btn-secondary btn-sm" onclick="setBpm(140)">140 (しっかり)</button>
+                </div>
+            </div>
+
+            <div class="setting-group">
+                <div class="setting-header">
+                    <span>運動時間</span>
+                    <span id="time-val" class="setting-value">3:00</span>
+                </div>
+                <input type="range" id="input-time" min="10" max="1800" step="10" value="180">
+                <div class="preset-buttons">
+                    <button class="btn btn-secondary btn-sm" onclick="setTimePreset(10)">10秒</button>
+                    <button class="btn btn-secondary btn-sm" onclick="setTimePreset(30)">30秒</button>
+                    <button class="btn btn-secondary btn-sm" onclick="setTimePreset(60)">1分</button>
+                    <button class="btn btn-secondary btn-sm" onclick="setTimePreset(180)">3分</button>
+                    <button class="btn btn-secondary btn-sm" onclick="setTimePreset(300)">5分</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. 脈拍測定＆休息モード -->
+    <div class="pulse-mode">
+        <div class="stage-card pulse-mode-container">
+            <div class="pulse-set-info" id="pulse-set-display">セット 1 / 5</div>
+            
+            <div class="pulse-status-text">
+                <span id="pulse-icon">💗</span>
+                <span id="pulse-instruction">脈拍を測定してください</span>
+            </div>
+
+            <!-- iOS風 円弧カウントダウン表示 -->
+            <div class="timer-ring-container">
+                <svg class="timer-ring-svg" viewBox="0 0 200 200">
+                    <circle class="ring-bg" cx="100" cy="100" r="90" />
+                    <circle id="ring-progress" class="ring-progress" cx="100" cy="100" r="90" />
+                </svg>
+                <div class="ring-center-content">
+                    <div id="pulse-timer-number" class="ring-number">30</div>
+                    <div class="ring-unit">SECONDS</div>
+                </div>
+            </div>
+
+            <button id="btn-cancel-pulse" class="btn btn-danger" style="width: 100%; margin-top: 10px;">
+                測定中断（最初の画面に戻る）
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- Web Audio API 設定 ---
+    let audioCtx = null;
+
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+
+    function playSound(freq, duration = 0.08, type = 'sine') {
+        if (!audioCtx) return;
+        try {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    // --- 定数 & 状態変数 ---
+    const STORAGE_KEY_BPM = 'step_app_bpm';
+    const STORAGE_KEY_TIME = 'step_app_time_sec';
+
+    let bpm = 120;
+    let totalTimeSec = 180;
+    let remainingTimeSec = 180;
+    
+    let isRunning = false;
+    let isPaused = false;
+    
+    let currentStep = 0;
+    let totalStepsCount = 0;
+    let leadFoot = 'right';
+    let isSecondHalf = false;
+
+    let timerInterval = null;
+    let stepInterval = null;
+
+    // 脈拍モード用変数
+    let pulseSet = 1;
+    const MAX_PULSE_SETS = 5;
+    let pulseSecInSet = 0; // 0~59秒
+    let pulseInterval = null;
+    const RING_CIRCUMFERENCE = 2 * Math.PI * 90; // 半径90の円周 ≒ 565.48
+
+    // --- DOM要素 ---
+    const elInstruction = document.getElementById('step-instruction');
+    const elAnnouncement = document.getElementById('announcement');
+    const elTimerDisplay = document.getElementById('timer-display');
+    const elBpmDisplay = document.getElementById('bpm-display');
+    const elStepCount = document.getElementById('step-count');
+    
+    const elInputBpm = document.getElementById('input-bpm');
+    const elBpmVal = document.getElementById('bpm-val');
+    const elInputTime = document.getElementById('input-time');
+    const elTimeVal = document.getElementById('time-val');
+
+    const btnStart = document.getElementById('btn-start');
+    const btnReset = document.getElementById('btn-reset');
+    const startIcon = document.getElementById('start-icon');
+    const startText = document.getElementById('start-text');
+
+    // 足エレメント
+    const footLeftFloor = document.getElementById('foot-left-floor');
+    const footRightFloor = document.getElementById('foot-right-floor');
+    const footLeftBench = document.getElementById('foot-left-bench');
+    const footRightBench = document.getElementById('foot-right-bench');
+
+    // 脈拍モードエレメント
+    const elPulseSetDisplay = document.getElementById('pulse-set-display');
+    const elPulseIcon = document.getElementById('pulse-icon');
+    const elPulseInstruction = document.getElementById('pulse-instruction');
+    const elPulseTimerNumber = document.getElementById('pulse-timer-number');
+    const elRingProgress = document.getElementById('ring-progress');
+    const btnCancelPulse = document.getElementById('btn-cancel-pulse');
+
+    // --- 初期化処理 ---
+    function init() {
+        const savedBpm = localStorage.getItem(STORAGE_KEY_BPM);
+        if (savedBpm) bpm = parseInt(savedBpm, 10);
+
+        const savedTime = localStorage.getItem(STORAGE_KEY_TIME);
+        if (savedTime) totalTimeSec = parseInt(savedTime, 10);
+
+        elInputBpm.value = bpm;
+        elBpmVal.textContent = bpm;
+        elBpmDisplay.textContent = `${bpm} BPM`;
+
+        elInputTime.value = totalTimeSec;
+        updateTimeDisplay(totalTimeSec);
+
+        remainingTimeSec = totalTimeSec;
+        updateTimerDisplay();
+
+        resetStepVisuals();
+    }
+
+    function formatTime(seconds) {
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function updateTimeDisplay(sec) {
+        elTimeVal.textContent = formatTime(sec);
+    }
+
+    function updateTimerDisplay() {
+        elTimerDisplay.textContent = formatTime(remainingTimeSec);
+    }
+
+    // --- イベントリスナー設定 ---
+    elInputBpm.addEventListener('input', (e) => {
+        bpm = parseInt(e.target.value, 10);
+        elBpmVal.textContent = bpm;
+        elBpmDisplay.textContent = `${bpm} BPM`;
+        localStorage.setItem(STORAGE_KEY_BPM, bpm);
+        
+        if (isRunning && !isPaused) {
+            restartStepInterval();
+        }
+    });
+
+    elInputTime.addEventListener('input', (e) => {
+        totalTimeSec = parseInt(e.target.value, 10);
+        updateTimeDisplay(totalTimeSec);
+        localStorage.setItem(STORAGE_KEY_TIME, totalTimeSec);
+        if (!isRunning) {
+            remainingTimeSec = totalTimeSec;
+            updateTimerDisplay();
+        }
+    });
+
+    function setBpm(val) {
+        bpm = val;
+        elInputBpm.value = bpm;
+        elBpmVal.textContent = bpm;
+        elBpmDisplay.textContent = `${bpm} BPM`;
+        localStorage.setItem(STORAGE_KEY_BPM, bpm);
+        if (isRunning && !isPaused) {
+            restartStepInterval();
+        }
+    }
+
+    function setTimePreset(val) {
+        totalTimeSec = val;
+        elInputTime.value = totalTimeSec;
+        updateTimeDisplay(totalTimeSec);
+        localStorage.setItem(STORAGE_KEY_TIME, totalTimeSec);
+        if (!isRunning) {
+            remainingTimeSec = totalTimeSec;
+            updateTimerDisplay();
+        }
+    }
+
+    btnStart.addEventListener('click', () => {
+        initAudio();
+        if (!isRunning) {
+            startWorkout();
+        } else if (isPaused) {
+            resumeWorkout();
+        } else {
+            pauseWorkout();
+        }
+    });
+
+    btnReset.addEventListener('click', () => {
+        resetWorkout();
+    });
+
+    btnCancelPulse.addEventListener('click', () => {
+        stopPulseMode();
+    });
+
+    // --- 運動ロジック ---
+    function startWorkout() {
+        isRunning = true;
+        isPaused = false;
+        
+        startIcon.textContent = '❚❚';
+        startText.textContent = 'ストップ';
+        
+        elInputBpm.disabled = true;
+        elInputTime.disabled = true;
+
+        timerInterval = setInterval(tickTimer, 1000);
+        restartStepInterval();
+    }
+
+    function pauseWorkout() {
+        isPaused = true;
+        startIcon.textContent = '▶';
+        startText.textContent = '再開';
+        
+        clearInterval(timerInterval);
+        clearInterval(stepInterval);
+        elInstruction.textContent = '一時停止中';
+    }
+
+    function resumeWorkout() {
+        isPaused = false;
+        startIcon.textContent = '❚❚';
+        startText.textContent = 'ストップ';
+        
+        timerInterval = setInterval(tickTimer, 1000);
+        restartStepInterval();
+    }
+
+    function resetWorkout() {
+        isRunning = false;
+        isPaused = false;
+        
+        clearInterval(timerInterval);
+        clearInterval(stepInterval);
+
+        startIcon.textContent = '▶';
+        startText.textContent = 'スタート';
+
+        elInputBpm.disabled = false;
+        elInputTime.disabled = false;
+
+        remainingTimeSec = totalTimeSec;
+        updateTimerDisplay();
+
+        currentStep = 0;
+        totalStepsCount = 0;
+        leadFoot = 'right';
+        isSecondHalf = false;
+
+        elStepCount.textContent = '0 歩';
+        elInstruction.textContent = 'スタートを押してください';
+        elAnnouncement.classList.remove('show');
+
+        resetStepVisuals();
+    }
+
+    function tickTimer() {
+        if (remainingTimeSec > 0) {
+            remainingTimeSec--;
+            updateTimerDisplay();
+
+            const halfTime = Math.floor(totalTimeSec / 2);
+            if (!isSecondHalf && remainingTimeSec <= halfTime && totalTimeSec > 1) {
+                isSecondHalf = true;
+                leadFoot = 'left';
+                triggerHalfTimeSwitch();
+            }
+        } else {
+            finishWorkout();
+        }
+    }
+
+    function triggerHalfTimeSwitch() {
+        playSound(880, 0.2, 'triangle');
+        setTimeout(() => playSound(880, 0.2, 'triangle'), 250);
+
+        elAnnouncement.textContent = '後半戦！ 主軸足を「左足」に切り替えます';
+        elAnnouncement.classList.add('show');
+
+        setTimeout(() => {
+            elAnnouncement.classList.remove('show');
+        }, 4000);
+    }
+
+    function finishWorkout() {
+        clearInterval(timerInterval);
+        clearInterval(stepInterval);
+        
+        playSound(523.25, 0.15);
+        setTimeout(() => playSound(659.25, 0.15), 150);
+        setTimeout(() => playSound(783.99, 0.3), 300);
+
+        startPulseMode();
+    }
+
+    function restartStepInterval() {
+        clearInterval(stepInterval);
+        const intervalMs = (60 / bpm) * 1000;
+        stepInterval = setInterval(nextStep, intervalMs);
+    }
+
+    function nextStep() {
+        const otherFoot = leadFoot === 'right' ? 'left' : 'right';
+        let stepText = '';
+
+        resetStepVisuals();
+
+        if (currentStep === 0) {
+            stepText = `${leadFoot === 'right' ? '右足' : '左足'} 上がる (台へ)`;
+            setFootState(leadFoot, 'bench', true);
+            setFootState(otherFoot, 'floor', false);
+            playSound(600);
+        } else if (currentStep === 1) {
+            stepText = `${otherFoot === 'right' ? '右足' : '左足'} 上がる (台へ)`;
+            setFootState(leadFoot, 'bench', false);
+            setFootState(otherFoot, 'bench', true);
+            playSound(800);
+        } else if (currentStep === 2) {
+            stepText = `${leadFoot === 'right' ? '右足' : '左足'} 下がる (床へ)`;
+            setFootState(leadFoot, 'floor', true);
+            setFootState(otherFoot, 'bench', false);
+            playSound(500);
+        } else if (currentStep === 3) {
+            stepText = `${otherFoot === 'right' ? '右足' : '左足'} 下がる (床へ)`;
+            setFootState(leadFoot, 'floor', false);
+            setFootState(otherFoot, 'floor', true);
+            playSound(400);
+        }
+
+        elInstruction.textContent = stepText;
+        totalStepsCount++;
+        elStepCount.textContent = `${totalStepsCount} 歩`;
+
+        currentStep = (currentStep + 1) % 4;
+    }
+
+    function setFootState(footName, position, isActive) {
+        const footEl = document.getElementById(`foot-${footName}-${position}`);
+        if (footEl) {
+            footEl.style.display = 'flex';
+            if (isActive) {
+                footEl.classList.add('active');
+            }
+        }
+    }
+
+    function resetStepVisuals() {
+        [footLeftFloor, footRightFloor, footLeftBench, footRightBench].forEach(el => {
+            el.classList.remove('active');
+        });
+
+        let leftPos = 'floor';
+        let rightPos = 'floor';
+
+        if (isRunning) {
+            const otherFoot = leadFoot === 'right' ? 'left' : 'right';
+            if (currentStep === 1) {
+                if (leadFoot === 'right') rightPos = 'bench';
+                else leftPos = 'bench';
+            } else if (currentStep === 2) {
+                rightPos = 'bench';
+                leftPos = 'bench';
+            } else if (currentStep === 3) {
+                if (otherFoot === 'right') rightPos = 'bench';
+                else leftPos = 'bench';
+            }
+        }
+
+        footLeftFloor.style.display = (leftPos === 'floor') ? 'flex' : 'none';
+        footLeftBench.style.display = (leftPos === 'bench') ? 'flex' : 'none';
+
+        footRightFloor.style.display = (rightPos === 'floor') ? 'flex' : 'none';
+        footRightBench.style.display = (rightPos === 'bench') ? 'flex' : 'none';
+    }
+
+    // --- 脈拍測定 & 休息モード (円弧アニメーション) ---
+    function startPulseMode() {
+        pulseSet = 1;
+        pulseSecInSet = 0;
+
+        document.body.classList.add('in-pulse-mode');
+        updatePulseUI();
+
+        clearInterval(pulseInterval);
+        pulseInterval = setInterval(tickPulseMode, 1000);
+    }
+
+    function stopPulseMode() {
+        clearInterval(pulseInterval);
+        document.body.classList.remove('in-pulse-mode');
+        resetWorkout();
+    }
+
+    function tickPulseMode() {
+        pulseSecInSet++;
+
+        if (pulseSecInSet >= 60) {
+            pulseSecInSet = 0;
+            pulseSet++;
+
+            if (pulseSet > MAX_PULSE_SETS) {
+                playSound(523.25, 0.2);
+                setTimeout(() => playSound(659.25, 0.2), 200);
+                setTimeout(() => playSound(783.99, 0.4), 400);
+                alert("全5セットの脈拍測定・休息サイクルが終了しました。お疲れ様でした！");
+                stopPulseMode();
+                return;
+            }
+        }
+
+        if (pulseSecInSet === 0) {
+            playSound(880, 0.2);
+        } else if (pulseSecInSet === 30) {
+            playSound(440, 0.2);
+        }
+
+        updatePulseUI();
+    }
+
+    function updatePulseUI() {
+        elPulseSetDisplay.textContent = `セット ${pulseSet} / ${MAX_PULSE_SETS}`;
+
+        let currentSec = 0;
+        let isMeasurePhase = pulseSecInSet < 30;
+
+        if (isMeasurePhase) {
+            // 脈拍測定フェーズ (0~29秒)
+            currentSec = 30 - pulseSecInSet;
+            elPulseIcon.textContent = '💗';
+            elPulseInstruction.textContent = '脈拍を測定してください';
+            elRingProgress.style.stroke = 'var(--pulse-color)';
+        } else {
+            // 休息フェーズ (30~59秒)
+            currentSec = 60 - pulseSecInSet;
+            elPulseIcon.textContent = '☕';
+            elPulseInstruction.textContent = '休息してください';
+            elRingProgress.style.stroke = 'var(--rest-color)';
+        }
+
+        // 数字表示
+        elPulseTimerNumber.textContent = currentSec;
+
+        // 円弧の長さを計算 (30秒で1周が短くなる)
+        const progressRatio = currentSec / 30;
+        const offset = RING_CIRCUMFERENCE * (1 - progressRatio);
+        elRingProgress.style.strokeDashoffset = offset;
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
